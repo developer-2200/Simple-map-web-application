@@ -1,1 +1,165 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distance & Route Calculator</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Leaflet Routing Machine CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f4f4f4;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input {
+      padding: 10px;
+      width: 300px;
+      margin: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 12px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+    #map {
+      height: 500px;
+      margin-top: 20px;
+      border-radius: 8px;
+    }
+    #result {
+      margin: 15px 0;
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🚗 Distance & Road Route Finder</h2>
+  
+  <label><strong>Location 1 (Start):</strong></label><br>
+  <input type="text" id="loc1" placeholder="e.g. New York, USA" value="Mumbai, India">
+
+  <label><strong>Location 2 (Destination):</strong></label><br>
+  <input type="text" id="loc2" placeholder="e.g. London, UK" value="Pune, India">
+
+  <br><br>
+  <button onclick="showRoute()">Show Route & Distance</button>
+
+  <div id="result"></div>
+  <div id="map"></div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet Routing Machine JS -->
+<script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
+<script>
+// Initialize map
+let map = L.map('map').setView([20, 77], 5); // Center on India
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+let routeControl = null;
+
+async function showRoute() {
+  const loc1 = document.getElementById('loc1').value.trim();
+  const loc2 = document.getElementById('loc2').value.trim();
+  const resultDiv = document.getElementById('result');
+
+  if (!loc1 || !loc2) {
+    resultDiv.innerHTML = `<span style="color:red;">Please enter both locations</span>`;
+    return;
+  }
+
+  resultDiv.innerHTML = "🔍 Finding route...";
+
+  try {
+    // Geocode both locations using Nominatim (OpenStreetMap)
+    const [start, end] = await Promise.all([
+      geocode(loc1),
+      geocode(loc2)
+    ]);
+
+    if (!start || !end) {
+      resultDiv.innerHTML = `<span style="color:red;">Could not find one or both locations.</span>`;
+      return;
+    }
+
+    // Remove previous route
+    if (routeControl) {
+      map.removeControl(routeControl);
+    }
+
+    // Create new route
+    routeControl = L.Routing.control({
+      waypoints: [
+        L.latLng(start.lat, start.lon),
+        L.latLng(end.lat, end.lon)
+      ],
+      routeWhileDragging: true,
+      show: true,
+      addWaypoints: false,
+      lineOptions: {
+        styles: [{ color: '#007bff', weight: 6 }]
+      }
+    }).addTo(map);
+
+    // Listen for route found
+    routeControl.on('routesfound', function(e) {
+      const route = e.routes[0];
+      const distance = (route.summary.totalDistance / 1000).toFixed(1); // in km
+      const time = Math.round(route.summary.totalTime / 60); // in minutes
+
+      resultDiv.innerHTML = `
+        ✅ <strong>Route Found!</strong><br>
+        📍 From: ${loc1}<br>
+        📍 To: ${loc2}<br>
+        🛣 Distance: <strong>${distance} km</strong><br>
+        ⏱ Estimated Time: <strong>${time} minutes</strong>
+      `;
+    });
+
+  } catch (err) {
+    resultDiv.innerHTML = `<span style="color:red;">Error: ${err.message}</span>`;
+  }
+}
+
+// Geocoding function using Nominatim
+async function geocode(address) {
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+  const data = await res.json();
+  if (data && data.length > 0) {
+    return { lat: data[0].lat, lon: data[0].lon };
+  }
+  return null;
+}
+</script>
+
+</body>
+                                                       </html>
